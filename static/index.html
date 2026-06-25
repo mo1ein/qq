@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>q Dashboard</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface-hover: #22263a;
+    --border: #2a2e3f;
+    --text: #e1e4ed;
+    --text-dim: #8b8fa3;
+    --accent: #6366f1;
+    --accent-hover: #818cf8;
+    --green: #22c55e;
+    --yellow: #eab308;
+    --red: #ef4444;
+    --blue: #3b82f6;
+    --purple: #a855f7;
+    --radius: 10px;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  .container { max-width: 1200px; margin: 0 auto; padding: 24px 16px; }
+
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 32px; flex-wrap: wrap; gap: 12px;
+  }
+  header h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.5px; }
+  header h1 span { color: var(--accent); }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px; text-align: center; cursor: pointer; transition: all 0.15s;
+  }
+  .stat-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .stat-card.active { border-color: var(--accent); background: var(--surface-hover); }
+  .stat-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); margin-bottom: 4px; }
+  .stat-value { font-size: 1.75rem; font-weight: 700; }
+
+  .stat-card[data-status="PENDING"] .stat-value { color: var(--yellow); }
+  .stat-card[data-status="CLAIMED"] .stat-value { color: var(--blue); }
+  .stat-card[data-status="RUNNING"] .stat-value { color: var(--purple); }
+  .stat-card[data-status="COMPLETED"] .stat-value { color: var(--green); }
+  .stat-card[data-status="FAILED"] .stat-value { color: var(--red); }
+
+  .toolbar {
+    display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center;
+  }
+  .toolbar input, .toolbar select, .toolbar button {
+    font-family: inherit; font-size: 0.85rem; border-radius: var(--radius);
+    border: 1px solid var(--border); background: var(--surface); color: var(--text);
+    padding: 8px 14px; outline: none; transition: border-color 0.15s;
+  }
+  .toolbar input:focus, .toolbar select:focus { border-color: var(--accent); }
+  .toolbar input { flex: 1; min-width: 180px; }
+  .toolbar button {
+    background: var(--accent); border-color: var(--accent); color: #fff;
+    cursor: pointer; font-weight: 600;
+  }
+  .toolbar button:hover { background: var(--accent-hover); }
+  .toolbar button.secondary { background: transparent; border-color: var(--border); color: var(--text-dim); }
+  .toolbar button.secondary:hover { border-color: var(--text-dim); color: var(--text); }
+  .toolbar button.danger { background: transparent; border-color: var(--red); color: var(--red); }
+  .toolbar button.danger:hover { background: var(--red); color: #fff; }
+  .toolbar button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .table-wrap {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    overflow: hidden;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 12px 16px; text-align: left; white-space: nowrap; }
+  th {
+    font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--text-dim); border-bottom: 1px solid var(--border); background: var(--surface-hover);
+  }
+  tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+  tr:last-child { border-bottom: none; }
+  tr:hover { background: var(--surface-hover); }
+  td { font-size: 0.85rem; }
+
+  .checkbox { width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent); }
+
+  .status {
+    display: inline-block; padding: 3px 10px; border-radius: 20px;
+    font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .status-PENDING { background: rgba(234,179,8,0.15); color: var(--yellow); }
+  .status-CLAIMED { background: rgba(59,130,246,0.15); color: var(--blue); }
+  .status-RUNNING { background: rgba(168,85,247,0.15); color: var(--purple); }
+  .status-COMPLETED { background: rgba(34,197,94,0.15); color: var(--green); }
+  .status-FAILED { background: rgba(239,68,68,0.15); color: var(--red); }
+
+  .mono { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.8rem; color: var(--text-dim); }
+  .truncate { max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+
+  .empty { padding: 48px; text-align: center; color: var(--text-dim); }
+
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    z-index: 100; align-items: center; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 24px; width: 90%; max-width: 480px;
+  }
+  .modal h2 { font-size: 1.1rem; margin-bottom: 16px; }
+  .modal label { display: block; font-size: 0.8rem; color: var(--text-dim); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .modal input, .modal textarea {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--bg); color: var(--text); font-family: inherit; font-size: 0.85rem;
+    margin-bottom: 12px; outline: none;
+  }
+  .modal input:focus, .modal textarea:focus { border-color: var(--accent); }
+  .modal textarea { resize: vertical; min-height: 80px; }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+  .modal-actions button { padding: 8px 20px; }
+
+  .detail-view { display: none; }
+  .detail-view.open { display: block; }
+  .detail-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+  .detail-header h2 { font-size: 1.1rem; }
+  .detail-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px; margin-bottom: 24px;
+  }
+  .detail-field label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); display: block; margin-bottom: 4px; }
+  .detail-field .value { font-size: 0.9rem; word-break: break-all; }
+  .detail-field .value.json { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.8rem; white-space: pre-wrap; background: var(--bg); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); }
+
+  @media (max-width: 640px) {
+    th:nth-child(n+6), td:nth-child(n+6) { display: none; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1><span>q</span> dashboard</h1>
+  </header>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="toolbar" id="toolbar">
+    <button id="newJobBtn" onclick="openCreateModal()">+ New Job</button>
+    <input type="text" id="searchInput" placeholder="Search by name..." oninput="debounceFetch()">
+    <button class="danger" id="bulkActionsBtn" style="display:none" onclick="showBulkActions()">Bulk Actions</button>
+    <button class="secondary" id="showAllBtn" style="display:none" onclick="clearFilter()">Show All</button>
+    <button class="secondary" id="releaseAllBtn" style="display:none" onclick="releaseAllClaimed()">Release All</button>
+    <button class="secondary" onclick="fetchJobs()">Refresh</button>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th><input type="checkbox" class="checkbox" id="selectAll" onchange="toggleSelectAll()"></th>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Status</th>
+          <th>Worker</th>
+          <th>Claims</th>
+          <th>Retries</th>
+          <th>Error</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody id="jobsBody"></tbody>
+    </table>
+    <div class="empty" id="emptyState">No jobs yet</div>
+  </div>
+
+  <div id="pagination" style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)">
+    <span id="pageInfo" style="font-size:0.85rem;color:var(--text-dim)"></span>
+    <div style="display:flex;gap:8px">
+      <button id="prevBtn" class="secondary" style="padding:6px 14px;border:1px solid var(--border);border-radius:var(--radius);background:transparent;color:var(--text-dim);cursor:pointer;font-family:inherit;font-size:0.85rem" onclick="prevPage()" disabled>← Prev</button>
+      <button id="nextBtn" class="secondary" style="padding:6px 14px;border:1px solid var(--border);border-radius:var(--radius);background:transparent;color:var(--text-dim);cursor:pointer;font-family:inherit;font-size:0.85rem" onclick="nextPage()">Next →</button>
+    </div>
+  </div>
+
+  <div class="detail-view" id="detailView">
+    <div class="detail-header">
+      <button class="secondary" style="padding:8px 14px;border:1px solid var(--border);border-radius:var(--radius);background:transparent;color:var(--text-dim);cursor:pointer;font-family:inherit;font-size:0.85rem" onclick="closeDetail()">&larr; Back</button>
+      <h2 id="detailTitle"></h2>
+      <span class="status" id="detailStatus"></span>
+    </div>
+    <div class="detail-grid" id="detailGrid"></div>
+    <div style="margin-top:16px">
+      <h3 style="font-size:0.85rem;color:var(--text-dim);margin-bottom:8px">Actions</h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap" id="detailActions"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="bulkModal">
+  <div class="modal">
+    <h2>Bulk Actions (<span id="selectedCount">0</span> selected)</h2>
+    <div style="display:flex;gap:8px;flex-wrap:wrap" id="bulkActions"></div>
+    <div class="modal-actions">
+      <button class="secondary" style="padding:8px 20px;border:1px solid var(--border);border-radius:var(--radius);background:transparent;color:var(--text-dim);cursor:pointer;font-family:inherit;font-size:0.85rem" onclick="closeBulkModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="createModal">
+  <div class="modal">
+    <h2>Create New Job</h2>
+    <label for="jobName">Name</label>
+    <input type="text" id="jobName" placeholder="e.g. send-email">
+    <label for="jobPayload">Payload (JSON, optional)</label>
+    <textarea id="jobPayload" placeholder='{"key": "value"}'></textarea>
+    <div class="modal-actions">
+      <button class="secondary" style="padding:8px 20px;border:1px solid var(--border);border-radius:var(--radius);background:transparent;color:var(--text-dim);cursor:pointer;font-family:inherit;font-size:0.85rem" onclick="closeCreateModal()">Cancel</button>
+      <button onclick="createJob()">Create</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = window.location.origin;
+let allJobs = [];
+let jobs = [];
+let activeFilter = null;
+let searchQuery = '';
+let selectedIds = new Set();
+let totalCount = 0;
+let currentOffset = 0;
+const PAGE_SIZE = 20;
+
+async function fetchJobs(offset = 0) {
+  try {
+    const params = new URLSearchParams({ limit: PAGE_SIZE, offset });
+    if (activeFilter) params.set('status', activeFilter);
+    const res = await fetch(`${API}/jobs?${params}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    allJobs = data.items;
+    totalCount = data.total;
+    currentOffset = offset;
+    applyFilter();
+    renderStats();
+    renderJobs();
+  } catch (e) {
+    console.error('Failed to fetch jobs:', e);
+  }
+}
+
+async function fetchStats() {
+  try {
+    const res = await fetch(`${API}/jobs/stats`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (e) {
+    console.error('Failed to fetch stats:', e);
+    return {};
+  }
+}
+
+function applyFilter() {
+  jobs = allJobs;
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    jobs = jobs.filter(j => j.name.toLowerCase().includes(q));
+  }
+}
+
+async function fetchJob(id) {
+  try {
+    const res = await fetch(`${API}/jobs/${id}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (e) {
+    console.error('Failed to fetch job:', e);
+    return null;
+  }
+}
+
+async function renderStats() {
+  const counts = await fetchStats();
+  const statuses = ['PENDING', 'CLAIMED', 'RUNNING', 'COMPLETED', 'FAILED'];
+  document.getElementById('stats').innerHTML =
+    statuses.map(s => `
+      <div class="stat-card ${activeFilter === s ? 'active' : ''}" data-status="${s}" onclick="filterBy('${s}')">
+        <div class="stat-label">${s}</div>
+        <div class="stat-value">${counts[s] || 0}</div>
+      </div>
+    `).join('');
+}
+
+function renderJobs() {
+  const body = document.getElementById('jobsBody');
+  const empty = document.getElementById('emptyState');
+
+  if (jobs.length === 0) {
+    body.innerHTML = '';
+    empty.style.display = 'block';
+    empty.textContent = searchQuery ? 'No matching jobs' : 'No jobs yet';
+    document.getElementById('selectAll').checked = false;
+    return;
+  }
+
+  empty.style.display = 'none';
+  body.innerHTML = jobs.map(j => `
+    <tr>
+      <td><input type="checkbox" class="checkbox" data-id="${j.id}" ${selectedIds.has(j.id) ? 'checked' : ''} onchange="toggleSelect(${j.id})"></td>
+      <td class="mono" style="cursor:pointer" onclick="viewDetail(${j.id})">#${j.id}</td>
+      <td class="truncate" style="cursor:pointer" onclick="viewDetail(${j.id})">${esc(j.name)}</td>
+      <td style="cursor:pointer" onclick="viewDetail(${j.id})"><span class="status status-${j.status}">${j.status}</span></td>
+      <td class="mono truncate" style="cursor:pointer" onclick="viewDetail(${j.id})">${j.worker_id || '-'}</td>
+      <td style="cursor:pointer" onclick="viewDetail(${j.id})">${j.claim_count}</td>
+      <td style="cursor:pointer" onclick="viewDetail(${j.id})">${j.retry_count}${j.retryable ? ' <span style="color:var(--yellow)">(retryable)</span>' : ''}</td>
+      <td class="truncate" style="cursor:pointer;max-width:150px;color:var(--red)" title="${esc(j.last_error || '')}">${j.last_error ? esc(j.last_error) : '-'}</td>
+      <td class="mono" style="cursor:pointer" onclick="viewDetail(${j.id})">${formatTime(j.created_at)}</td>
+    </tr>
+  `).join('');
+
+  updateBulkBtn();
+  updatePagination();
+  document.getElementById('selectAll').checked = jobs.length > 0 && jobs.every(j => selectedIds.has(j.id));
+}
+
+function filterBy(status) {
+  if (activeFilter === status) return;
+  activeFilter = status;
+  selectedIds.clear();
+  fetchJobs(0);
+  closeDetail();
+  updateToolbarButtons();
+}
+
+function clearFilter() {
+  activeFilter = null;
+  selectedIds.clear();
+  fetchJobs(0);
+  closeDetail();
+  updateToolbarButtons();
+}
+
+function updateToolbarButtons() {
+  document.getElementById('newJobBtn').style.display = (!activeFilter || activeFilter === 'PENDING') ? '' : 'none';
+  document.getElementById('releaseAllBtn').style.display = (activeFilter === 'CLAIMED' && allJobs.some(j => j.status === 'CLAIMED')) ? '' : 'none';
+  document.getElementById('showAllBtn').style.display = activeFilter ? '' : 'none';
+}
+
+function toggleSelect(id) {
+  if (selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id);
+  updateBulkBtn();
+  document.getElementById('selectAll').checked = jobs.length > 0 && jobs.every(j => selectedIds.has(j.id));
+}
+
+function toggleSelectAll() {
+  const checked = document.getElementById('selectAll').checked;
+  if (checked) jobs.forEach(j => selectedIds.add(j.id));
+  else jobs.forEach(j => selectedIds.delete(j.id));
+  renderJobs();
+}
+
+function updateBulkBtn() {
+  const btn = document.getElementById('bulkActionsBtn');
+  if (selectedIds.size > 0) {
+    btn.style.display = '';
+    btn.textContent = `Bulk Actions (${selectedIds.size})`;
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+function showBulkActions() {
+  const selected = allJobs.filter(j => selectedIds.has(j.id));
+  const modal = document.getElementById('bulkModal');
+  document.getElementById('selectedCount').textContent = selected.length;
+
+  const statuses = new Set(selected.map(j => j.status));
+  let actions = '';
+
+  if (statuses.has('PENDING')) {
+    actions += `<button style="padding:8px 16px;border-radius:var(--radius);border:1px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer;font-family:inherit;font-size:0.85rem;font-weight:600" onclick="bulkAction('claim')">Claim All Pending</button>`;
+  }
+  if (statuses.has('CLAIMED')) {
+    actions += `<button style="padding:8px 16px;border-radius:var(--radius);border:1px solid var(--yellow);background:transparent;color:var(--yellow);cursor:pointer;font-family:inherit;font-size:0.85rem;font-weight:600" onclick="bulkRelease()">Release All Claimed</button>`;
+    actions += `<button style="padding:8px 16px;border-radius:var(--radius);border:1px solid var(--green);background:transparent;color:var(--green);cursor:pointer;font-family:inherit;font-size:0.85rem;font-weight:600" onclick="bulkAction('start')">Start All Claimed</button>`;
+  }
+  if (statuses.has('RUNNING')) {
+    actions += `<button style="padding:8px 16px;border-radius:var(--radius);border:1px solid var(--green);background:transparent;color:var(--green);cursor:pointer;font-family:inherit;font-size:0.85rem;font-weight:600" onclick="bulkAction('complete')">Complete All Running</button>`;
+  }
+  if (statuses.has('FAILED')) {
+    actions += `<button style="padding:8px 16px;border-radius:var(--radius);border:1px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer;font-family:inherit;font-size:0.85rem;font-weight:600" onclick="bulkAction('requeue')">Requeue All Failed</button>`;
+  }
+
+  document.getElementById('bulkActions').innerHTML = actions || '<p style="color:var(--text-dim)">No bulk actions available for selected jobs.</p>';
+  modal.classList.add('open');
+}
+
+function closeBulkModal() {
+  document.getElementById('bulkModal').classList.remove('open');
+}
+
+async function bulkAction(action) {
+  closeBulkModal();
+  const selected = allJobs.filter(j => selectedIds.has(j.id));
+  for (const j of selected) {
+    const body = j.worker_id ? { worker_id: j.worker_id } : {};
+    try {
+      await fetch(`${API}/jobs/${j.id}/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    } catch {}
+  }
+  selectedIds.clear();
+  await fetchJobs();
+  updateToolbarButtons();
+}
+
+async function bulkRelease() {
+  closeBulkModal();
+  const selected = allJobs.filter(j => selectedIds.has(j.id) && j.status === 'CLAIMED');
+  for (const j of selected) {
+    try {
+      await fetch(`${API}/jobs/${j.id}/release`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ worker_id: j.worker_id }),
+      });
+    } catch {}
+  }
+  selectedIds.clear();
+  await fetchJobs();
+  updateToolbarButtons();
+}
+
+async function viewDetail(id) {
+  const j = await fetchJob(id);
+  if (!j) return;
+  document.getElementById('detailView').classList.add('open');
+  document.querySelector('.table-wrap').style.display = 'none';
+  document.getElementById('toolbar').style.display = 'none';
+  document.getElementById('stats').style.display = 'none';
+
+  document.getElementById('detailTitle').textContent = `#${j.id} ${j.name}`;
+  const st = document.getElementById('detailStatus');
+  st.textContent = j.status;
+  st.className = `status status-${j.status}`;
+
+  const fields = [
+    ['ID', j.id],
+    ['Status', j.status],
+    ['Worker ID', j.worker_id || 'none'],
+    ['Claims', j.claim_count],
+    ['Retry Count', `${j.retry_count} / ${j.max_retries}`],
+    ['Retryable', j.retryable ? 'Yes' : 'No'],
+    ['Last Error', j.last_error || 'none'],
+    ['Next Retry', j.next_retry_at ? formatTime(j.next_retry_at) : 'none'],
+    ['Created', j.created_at],
+    ['Updated', j.updated_at],
+  ];
+  if (j.payload) fields.push(['Payload', JSON.stringify(j.payload, null, 2)]);
+
+  document.getElementById('detailGrid').innerHTML = fields.map(([label, val]) => `
+    <div class="detail-field">
+      <label>${label}</label>
+      <div class="value ${label === 'Payload' ? 'json' : ''}">${esc(String(val))}</div>
+    </div>
+  `).join('');
+
+  let actions = '';
+  if (j.status === 'PENDING') {
+    actions += actionBtn(j.id, 'claim', 'Claim', '--accent');
+  } else if (j.status === 'CLAIMED') {
+    actions += actionBtn(j.id, 'start', 'Start', '--green', j.worker_id);
+    actions += actionBtn(j.id, 'fail', 'Fail', '--red', j.worker_id);
+    actions += actionBtn(j.id, 'release', 'Release', '--yellow', j.worker_id);
+  } else if (j.status === 'RUNNING') {
+    actions += actionBtn(j.id, 'complete', 'Complete', '--green', j.worker_id);
+    actions += actionBtn(j.id, 'fail', 'Fail', '--red', j.worker_id);
+  } else if (j.status === 'FAILED') {
+    actions += actionBtn(j.id, 'requeue', 'Requeue', '--accent');
+    actions += actionBtn(j.id, 'retry', 'Retry', '--yellow');
+  }
+  document.getElementById('detailActions').innerHTML = actions;
+}
+
+function actionBtn(id, action, label, colorVar, workerId) {
+  const dataAttr = workerId ? ` data-worker-id="${esc(workerId)}"` : '';
+  const onclick = `actionJob(${id},'${action}',this)`;
+  return `<button style="padding:6px 16px;border-radius:var(--radius);border:1px solid var(${colorVar});background:transparent;color:var(${colorVar});cursor:pointer;font-family:inherit;font-size:0.8rem;font-weight:600" onclick="${onclick}"${dataAttr}>${label}</button>`;
+}
+
+async function actionJob(id, action, el) {
+  const workerId = el.dataset.workerId;
+  const body = workerId ? { worker_id: workerId } : {};
+  try {
+    const res = await fetch(`${API}/jobs/${id}/${action}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      alert(err.detail || `Error ${res.status}`);
+      return;
+    }
+    await fetchJobs();
+    viewDetail(id);
+  } catch (e) {
+    alert('Request failed');
+  }
+}
+
+async function releaseAllClaimed() {
+  const claimedJobs = allJobs.filter(j => j.status === 'CLAIMED');
+  if (claimedJobs.length === 0) return;
+  if (!confirm(`Release ${claimedJobs.length} claimed job(s) back to pending?`)) return;
+
+  for (const j of claimedJobs) {
+    try {
+      await fetch(`${API}/jobs/${j.id}/release`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ worker_id: j.worker_id }),
+      });
+    } catch {}
+  }
+  selectedIds.clear();
+  await fetchJobs();
+  updateToolbarButtons();
+}
+
+function closeDetail() {
+  document.getElementById('detailView').classList.remove('open');
+  document.querySelector('.table-wrap').style.display = '';
+  document.getElementById('toolbar').style.display = '';
+  document.getElementById('stats').style.display = '';
+  updateToolbarButtons();
+}
+
+function openCreateModal() {
+  document.getElementById('createModal').classList.add('open');
+  document.getElementById('jobName').value = '';
+  document.getElementById('jobPayload').value = '';
+  document.getElementById('jobName').focus();
+}
+
+function closeCreateModal() {
+  document.getElementById('createModal').classList.remove('open');
+}
+
+async function createJob() {
+  const name = document.getElementById('jobName').value.trim();
+  if (!name) { document.getElementById('jobName').focus(); return; }
+  const payloadStr = document.getElementById('jobPayload').value.trim();
+  let payload = null;
+  if (payloadStr) {
+    try { payload = JSON.parse(payloadStr); }
+    catch { alert('Invalid JSON in payload'); return; }
+  }
+  const createBtn = document.querySelector('#createModal .modal-actions button:last-child');
+  createBtn.disabled = true;
+  try {
+    const res = await fetch(`${API}/jobs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, payload }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      alert(err.detail || `Error ${res.status}`);
+      return;
+    }
+    closeCreateModal();
+    await fetchJobs();
+  } catch (e) {
+    alert('Request failed');
+  } finally {
+    createBtn.disabled = false;
+  }
+}
+
+function formatTime(iso) {
+  if (!iso) return '-';
+  const d = new Date(iso);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function updatePagination() {
+  const start = currentOffset + 1;
+  const end = Math.min(currentOffset + PAGE_SIZE, totalCount);
+  document.getElementById('pageInfo').textContent = totalCount > 0
+    ? `Showing ${start}-${end} of ${totalCount} jobs`
+    : 'No jobs';
+  document.getElementById('prevBtn').disabled = currentOffset === 0;
+  document.getElementById('nextBtn').disabled = currentOffset + PAGE_SIZE >= totalCount;
+  document.getElementById('pagination').style.display = (totalCount > 0 || currentOffset > 0) ? 'flex' : 'none';
+}
+
+function prevPage() {
+  if (currentOffset > 0) fetchJobs(Math.max(0, currentOffset - PAGE_SIZE));
+}
+
+function nextPage() {
+  if (currentOffset + PAGE_SIZE < totalCount) fetchJobs(currentOffset + PAGE_SIZE);
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+let debounceTimeout;
+function debounceFetch() {
+  searchQuery = document.getElementById('searchInput').value;
+  clearTimeout(debounceTimeout);
+  debounceTimeout = setTimeout(() => { applyFilter(); renderJobs(); }, 200);
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (document.getElementById('createModal').classList.contains('open')) closeCreateModal();
+    else if (document.getElementById('bulkModal').classList.contains('open')) closeBulkModal();
+    else if (document.getElementById('detailView').classList.contains('open')) closeDetail();
+  }
+});
+
+document.getElementById('createModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeCreateModal();
+});
+document.getElementById('bulkModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeBulkModal();
+});
+
+fetchJobs();
+</script>
+</body>
+</html>
