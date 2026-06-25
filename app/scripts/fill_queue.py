@@ -1,11 +1,6 @@
 """
-Periodically inserts sample jobs into the database so you can watch the
-worker pick them up in real-time. Run alongside uvicorn.
-
 Usage:
     uv run python scripts/fill_queue.py [--count 10] [--interval 2]
-
-Dashboard: http://localhost:8000
 """
 
 import argparse
