@@ -7,7 +7,7 @@ from app.api.requests.job_requests import (
     PaginatedJobsResponse,
     WorkerRequest,
 )
-from app.repository.dependencies import get_job_service
+from app.repository.database import get_job_service
 from app.service.job_service import JobService
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -53,10 +53,10 @@ def list_jobs(
             name=j.name,
             status=j.status,
             worker_id=j.worker_id,
-            created_at=j.created_at,
-            updated_at=j.updated_at,
             retry_count=j.retry_count,
             retryable=j.retryable,
+            created_at=j.created_at,
+            updated_at=j.updated_at,
         )
         for j in jobs
     ]

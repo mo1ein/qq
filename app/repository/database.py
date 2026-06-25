@@ -3,7 +3,7 @@ import threading
 from contextlib import contextmanager
 from pathlib import Path
 
-from app.config import configs
+from app.config.configs import configs
 
 claim_lock = threading.Lock()
 
@@ -33,7 +33,7 @@ CREATE INDEX IF NOT EXISTS idx_jobs_status_retryable ON jobs(status, retryable, 
 
 class Database:
     def __init__(self, db_path: str | None = None):
-        self._path = Path(db_path or configs.configs.DB_PATH)
+        self._path = Path(db_path or configs.DB_PATH)
 
     @property
     def path(self) -> Path:
@@ -43,7 +43,7 @@ class Database:
         self._path = path
 
     def get_connection(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(str(self._path), timeout=configs.configs.DB_TIMEOUT)
+        conn = sqlite3.connect(str(self._path), timeout=configs.DB_TIMEOUT)
         conn.row_factory = sqlite3.Row
         return conn
 
@@ -68,3 +68,44 @@ class Database:
             raise
         finally:
             conn.close()
+
+
+_db: Database | None = None
+_repo = None
+_service = None
+
+
+def get_database() -> Database:
+    global _db
+    if _db is None:
+        _db = Database()
+    return _db
+
+
+def get_job_repository():
+    from app.repository.job_repository import JobRepository
+
+    global _repo
+    if _repo is None:
+        _repo = JobRepository(get_database())
+    return _repo
+
+
+def get_job_service():
+    from app.service.job_service import JobService
+
+    global _service
+    if _service is None:
+        _service = JobService(get_job_repository())
+    return _service
+
+
+def set_database(db: Database) -> None:
+    global _db, _repo, _service
+    _db = db
+    from app.repository.job_repository import JobRepository
+
+    _repo = JobRepository(db)
+    from app.service.job_service import JobService
+
+    _service = JobService(_repo)

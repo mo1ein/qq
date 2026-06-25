@@ -32,14 +32,14 @@ class JobModel(BaseModel):
     status: JobStatus = JobStatus.PENDING
     payload: dict[str, Any] | None = None
     worker_id: str | None = None
-    created_at: str = ""
-    updated_at: str = ""
     claim_count: int = 0
     retry_count: int = 0
     max_retries: int = MAX_RETRIES
     next_retry_at: str | None = None
     last_error: str | None = None
     retryable: bool = True
+    created_at: str = ""
+    updated_at: str = ""
 
     @field_validator("payload", mode="before")
     @classmethod

@@ -17,14 +17,14 @@ class JobResponse(BaseModel):
     status: JobStatus
     payload: Optional[dict] = None
     worker_id: Optional[str] = None
-    created_at: str
-    updated_at: str
     claim_count: int = 0
     retry_count: int = 0
     max_retries: int = 5
     next_retry_at: Optional[str] = None
     last_error: Optional[str] = None
     retryable: bool = True
+    created_at: str
+    updated_at: str
 
 
 class JobListItem(BaseModel):
@@ -32,11 +32,11 @@ class JobListItem(BaseModel):
     name: str
     status: JobStatus
     worker_id: Optional[str] = None
-    created_at: str
-    updated_at: str
     claim_count: int = 0
     retry_count: int = 0
     retryable: bool = True
+    created_at: str
+    updated_at: str
 
 
 class PaginatedJobsResponse(BaseModel):

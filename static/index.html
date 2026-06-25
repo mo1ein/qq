@@ -454,6 +454,7 @@ async function viewDetail(id) {
   document.querySelector('.table-wrap').style.display = 'none';
   document.getElementById('toolbar').style.display = 'none';
   document.getElementById('stats').style.display = 'none';
+  document.getElementById('pagination').style.display = 'none';
 
   document.getElementById('detailTitle').textContent = `#${j.id} ${j.name}`;
   const st = document.getElementById('detailStatus');
@@ -549,6 +550,7 @@ function closeDetail() {
   document.querySelector('.table-wrap').style.display = '';
   document.getElementById('toolbar').style.display = '';
   document.getElementById('stats').style.display = '';
+  document.getElementById('pagination').style.display = '';
   updateToolbarButtons();
 }
 
