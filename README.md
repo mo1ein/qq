@@ -1,6 +1,6 @@
 # Job Queue System
 
-A job queue built with **FastAPI + SQLite** where background workers poll, claim, and execute jobs atomically. No message broker needed — just a database.
+A job queue built with **FastAPI + SQLite** where background workers poll, claim, and execute jobs atomically.
 
 ![Dashboard](dashboard.png)
 
