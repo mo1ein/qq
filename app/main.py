@@ -22,7 +22,7 @@ STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 async def lifespan(app: FastAPI):
     get_database().init()
 
-    worker = Worker(repo=get_job_repository())
+    worker = Worker(job_repo=get_job_repository())
     worker.start()
 
     yield

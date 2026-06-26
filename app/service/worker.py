@@ -19,8 +19,8 @@ MAX_POLL_INTERVAL = 5.0
 
 
 class Worker:
-    def __init__(self, repo: JobRepository, poll_interval: float = POLL_INTERVAL):
-        self.repo = repo
+    def __init__(self, job_repo: JobRepository, poll_interval: float = POLL_INTERVAL):
+        self.job_repo = job_repo
         self.poll_interval = poll_interval
         self._task: asyncio.Task | None = None
         self._semaphore = asyncio.Semaphore(MAX_CONCURRENT)
@@ -47,7 +47,7 @@ class Worker:
             try:
                 if recover_counter % 600 == 0:
                     recovered = await asyncio.to_thread(
-                        self.repo.recover_stuck_jobs,
+                        self.job_repo.recover_stuck_jobs,
                         timeout_minutes=CLAIM_TIMEOUT_MINUTES,
                     )
                     if recovered:
@@ -78,9 +78,9 @@ class Worker:
 
     def _claim_next(self) -> JobModel | None:
         with claim_lock:
-            job = self.repo.claim_next_pending(WORKER_ID)
+            job = self.job_repo.claim_next_pending(WORKER_ID)
             if job is None:
-                job = self.repo.claim_next_retryable(WORKER_ID)
+                job = self.job_repo.claim_next_retryable(WORKER_ID)
 
         if job:
             logger.info(f"Claimed job {job.id} ({job.name})")
@@ -95,7 +95,7 @@ class Worker:
         worker_id = job.worker_id
 
         started = await asyncio.to_thread(
-            self.repo.update_status,
+            self.job_repo.update_status,
             job_id,
             JobStatus.RUNNING,
             expected_status=JobStatus.CLAIMED,
@@ -109,7 +109,7 @@ class Worker:
             await self._do_work(job)
 
             await asyncio.to_thread(
-                self.repo.update_status,
+                self.job_repo.update_status,
                 job_id,
                 JobStatus.COMPLETED,
                 expected_status=JobStatus.RUNNING,
@@ -125,7 +125,7 @@ class Worker:
         new_retry_count = job.retry_count + 1 if is_retryable else job.retry_count
         backoff_seconds = compute_backoff_delay(job.retry_count) if is_retryable else 0
 
-        self.repo.fail_job(
+        self.job_repo.fail_job(
             job.id,
             retryable=is_retryable,
             error_message=str(exc)[:500],
