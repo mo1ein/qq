@@ -9,7 +9,7 @@ from app.api.requests.job_requests import (
 )
 from app.repository.database import get_job_service
 from app.service.job_service import JobService
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -74,8 +74,13 @@ def get_job(job_id: int, service: JobService = Depends(get_job_service)):
 @router.post(
     "/{job_id}/claim", response_model=JobResponse, response_model_exclude_none=True
 )
-def claim_job(job_id: int, service: JobService = Depends(get_job_service)):
-    job = service.claim_job(job_id)
+def claim_job(
+    job_id: int,
+    data: WorkerRequest | None = Body(None),
+    service: JobService = Depends(get_job_service),
+):
+    worker_id = data.worker_id if data else None
+    job = service.claim_job(job_id, worker_id=worker_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found or not pending")
     return JobResponse.model_validate(job.model_dump())

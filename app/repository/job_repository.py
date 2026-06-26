@@ -214,47 +214,6 @@ class JobRepository:
             row = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
         return self._to_model(row) if row else None
 
-    def update_status_with_fields(
-        self,
-        job_id: int,
-        status: JobStatus,
-        *,
-        fields: dict | None = None,
-        expected_status: JobStatus | None = None,
-        expected_worker_id: str | None = None,
-    ) -> JobModel | None:
-        with self.db.session() as conn:
-            conn.execute("BEGIN IMMEDIATE")
-            set_clauses = ["status = ?", "updated_at = CURRENT_TIMESTAMP"]
-            params: list[object] = [status.value]
-            if status == JobStatus.COMPLETED:
-                set_clauses.extend(
-                    [
-                        "retryable = 0",
-                        "next_retry_at = NULL",
-                    ]
-                )
-            if fields:
-                for key, val in fields.items():
-                    set_clauses.append(f"{key} = ?")
-                    params.append(val)
-            params.append(job_id)
-            where = ["id = ?"]
-            if expected_status is not None:
-                where.append("status = ?")
-                params.append(expected_status.value)
-            if expected_worker_id is not None:
-                where.append("worker_id = ?")
-                params.append(expected_worker_id)
-            cursor = conn.execute(
-                f"UPDATE jobs SET {', '.join(set_clauses)} WHERE {' AND '.join(where)}",
-                tuple(params),
-            )
-            if cursor.rowcount != 1:
-                return None
-            row = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
-        return self._to_model(row) if row else None
-
     def fail_job(
         self,
         job_id: int,

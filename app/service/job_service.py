@@ -10,6 +10,9 @@ from app.repository.job_repository import JobRepository
 from app.utils.util import compute_backoff_delay
 
 
+DEFAULT_WORKER_PREFIX = "api-worker"
+
+
 class JobService:
     def __init__(self, repo: JobRepository):
         self.repo = repo
@@ -35,8 +38,9 @@ class JobService:
         total = self.repo.count_all(status)
         return [JobModel.model_validate(model) for model in models], total
 
-    def claim_job(self, job_id: int) -> JobModel | None:
-        worker_id = uuid.uuid4().hex[:12]
+    def claim_job(self, job_id: int, worker_id: str | None = None) -> JobModel | None:
+        if worker_id is None:
+            worker_id = f"{DEFAULT_WORKER_PREFIX}-{uuid.uuid4().hex[:8]}"
         with claim_lock:
             model = self.repo.claim_job(job_id, worker_id)
         return JobModel.model_validate(model) if model else None
