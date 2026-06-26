@@ -138,7 +138,9 @@ class TestInterviewDemo:
             while True:
                 await asyncio.sleep(0.5)
                 jobs = repo.list_all(limit=1000)
-                if len(jobs) >= 15 and all(j.status in (JobStatus.COMPLETED, JobStatus.FAILED) for j in jobs):
+                if len(jobs) >= 15 and all(
+                    j.status in (JobStatus.COMPLETED, JobStatus.FAILED) for j in jobs
+                ):
                     break
             await worker.stop()
 
@@ -152,6 +154,32 @@ class TestInterviewDemo:
 
         assert len(completed) + len(failed) == 15
         assert len(completed) > 0
+
+    def test_pressure_50_jobs(self, repo):
+        for i in range(50):
+            repo.create(JobModel(name=f"pressure-{i}"))
+
+        worker = Worker(repo, poll_interval=0.01)
+
+        async def run():
+            worker.start()
+            while True:
+                await asyncio.sleep(0.5)
+                jobs = repo.list_all(limit=1000)
+                if len(jobs) >= 50 and all(
+                    j.status in (JobStatus.COMPLETED, JobStatus.FAILED) for j in jobs
+                ):
+                    break
+            await worker.stop()
+
+        asyncio.run(run())
+
+        jobs = repo.list_all()
+        assert len(jobs) == 50
+        unresolved = [
+            j for j in jobs if j.status not in (JobStatus.COMPLETED, JobStatus.FAILED)
+        ]
+        assert len(unresolved) == 0
 
     def test_concurrent_workers_divide_work(self, repo):
         for i in range(15):

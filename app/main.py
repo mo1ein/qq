@@ -30,6 +30,8 @@ async def lifespan(app: FastAPI):
     await worker.stop()
 
 
+get_database().init()
+
 app = FastAPI(
     title="Job Queue API",
     description="Job queue with safe claim mechanism",

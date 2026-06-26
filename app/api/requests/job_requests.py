@@ -46,7 +46,7 @@ class PaginatedJobsResponse(BaseModel):
 
 
 class WorkerRequest(BaseModel):
-    worker_id: str = Field(..., min_length=1, max_length=128)
+    worker_id: str | None = Field(default=None, max_length=128)
 
 
 class FailJobRequest(BaseModel):

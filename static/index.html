@@ -401,6 +401,7 @@ function showBulkActions() {
     actions += `<button style="padding:8px 16px;border-radius:var(--radius);border:1px solid var(--green);background:transparent;color:var(--green);cursor:pointer;font-family:inherit;font-size:0.85rem;font-weight:600" onclick="bulkAction('complete')">Complete All Running</button>`;
   }
   if (statuses.has('FAILED')) {
+    actions += `<button style="padding:8px 16px;border-radius:var(--radius);border:1px solid var(--yellow);background:transparent;color:var(--yellow);cursor:pointer;font-family:inherit;font-size:0.85rem;font-weight:600" onclick="bulkRetry()">Retry All Failed</button>`;
     actions += `<button style="padding:8px 16px;border-radius:var(--radius);border:1px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer;font-family:inherit;font-size:0.85rem;font-weight:600" onclick="bulkAction('requeue')">Requeue All Failed</button>`;
   }
 
@@ -439,6 +440,23 @@ async function bulkRelease() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ worker_id: j.worker_id }),
+      });
+    } catch {}
+  }
+  selectedIds.clear();
+  await fetchJobs();
+  updateToolbarButtons();
+}
+
+async function bulkRetry() {
+  closeBulkModal();
+  const selected = allJobs.filter(j => selectedIds.has(j.id) && j.status === 'FAILED');
+  for (const j of selected) {
+    try {
+      await fetch(`${API}/jobs/${j.id}/retry`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
       });
     } catch {}
   }

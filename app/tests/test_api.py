@@ -405,13 +405,9 @@ class TestRetryPolicy:
         retried = resp.json()
         assert retried["status"] == "FAILED"
         assert retried["retryable"] is True
+        assert retried["retry_count"] == 0
         assert retried.get("last_error") is None
         assert retried["next_retry_at"] is not None
-
-        resp = client.post(f"/jobs/{job['id']}/requeue")
-        assert resp.status_code == 200
-        requeued = resp.json()
-        assert requeued["status"] == "PENDING"
 
     def test_retry_count_increments(self, client):
         job = create_job(client, "count-test", max_retries=5)

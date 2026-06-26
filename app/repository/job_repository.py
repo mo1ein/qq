@@ -234,7 +234,6 @@ class JobRepository:
                         last_error = ?,
                         retry_count = ?,
                         next_retry_at = {next_retry_expr},
-                        worker_id = NULL,
                         updated_at = CURRENT_TIMESTAMP
                     WHERE id = ? AND status IN ('RUNNING', 'CLAIMED')
                     """,
@@ -249,7 +248,6 @@ class JobRepository:
                         last_error = ?,
                         retry_count = ?,
                         next_retry_at = NULL,
-                        worker_id = NULL,
                         updated_at = CURRENT_TIMESTAMP
                     WHERE id = ? AND status IN ('RUNNING', 'CLAIMED')
                     """,
@@ -268,6 +266,7 @@ class JobRepository:
                 UPDATE jobs
                 SET status = 'FAILED',
                     retryable = 1,
+                    retry_count = 0,
                     last_error = NULL,
                     next_retry_at = CURRENT_TIMESTAMP,
                     updated_at = CURRENT_TIMESTAMP
