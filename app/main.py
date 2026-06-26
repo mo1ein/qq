@@ -20,7 +20,6 @@ STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    get_database().init()
 
     worker = Worker(job_repo=get_job_repository())
     worker.start()
