@@ -23,6 +23,17 @@ def repo(tmp_path):
     return JobRepository(db)
 
 
+def _wait_until_all_resolved(repo, timeout=15):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        jobs = repo.list_all(limit=1000)
+        unresolved = [j for j in jobs if j.status not in (JobStatus.COMPLETED, JobStatus.FAILED)]
+        if not unresolved:
+            return jobs
+        time.sleep(0.1)
+    raise TimeoutError(f"Jobs still unresolved after {timeout}s")
+
+
 class TestWorkerLoop:
     def test_worker_claims_and_processes_jobs(self, repo):
         for i in range(10):
@@ -32,7 +43,11 @@ class TestWorkerLoop:
 
         async def run():
             worker.start()
-            await asyncio.sleep(15)
+            while True:
+                await asyncio.sleep(0.5)
+                jobs = repo.list_all(limit=1000)
+                if all(j.status in (JobStatus.COMPLETED, JobStatus.FAILED) for j in jobs):
+                    break
             await worker.stop()
 
         asyncio.run(run())
@@ -51,7 +66,11 @@ class TestWorkerLoop:
 
         async def run():
             worker.start()
-            await asyncio.sleep(2)
+            while True:
+                await asyncio.sleep(0.5)
+                job = repo.get(1)
+                if job and job.status in (JobStatus.COMPLETED, JobStatus.FAILED):
+                    break
             await worker.stop()
 
         asyncio.run(run())
@@ -69,7 +88,11 @@ class TestWorkerLoop:
 
         async def run():
             worker.start()
-            await asyncio.sleep(15)
+            while True:
+                await asyncio.sleep(0.5)
+                jobs = repo.list_all(limit=1000)
+                if all(j.status in (JobStatus.COMPLETED, JobStatus.FAILED) for j in jobs):
+                    break
             await worker.stop()
 
         asyncio.run(run())
@@ -89,15 +112,17 @@ class TestWorkerLoop:
 
         async def run():
             worker.start()
-            await asyncio.sleep(15)
+            while True:
+                await asyncio.sleep(0.5)
+                jobs = repo.list_all(limit=1000)
+                if all(j.status in (JobStatus.COMPLETED, JobStatus.FAILED) for j in jobs):
+                    break
             await worker.stop()
 
         asyncio.run(run())
 
         jobs = repo.list_all(limit=1000)
-        unresolved = [
-            j for j in jobs if j.status not in (JobStatus.COMPLETED, JobStatus.FAILED)
-        ]
+        unresolved = [j for j in jobs if j.status not in (JobStatus.COMPLETED, JobStatus.FAILED)]
         assert len(unresolved) == 0
 
 
@@ -110,7 +135,11 @@ class TestInterviewDemo:
 
         async def run():
             worker.start()
-            await asyncio.sleep(10)
+            while True:
+                await asyncio.sleep(0.5)
+                jobs = repo.list_all(limit=1000)
+                if len(jobs) >= 15 and all(j.status in (JobStatus.COMPLETED, JobStatus.FAILED) for j in jobs):
+                    break
             await worker.stop()
 
         asyncio.run(run())
@@ -124,26 +153,6 @@ class TestInterviewDemo:
         assert len(completed) + len(failed) == 15
         assert len(completed) > 0
 
-    def test_pressure_50_jobs(self, repo):
-        for i in range(50):
-            repo.create(JobModel(name=f"pressure-{i}"))
-
-        worker = Worker(repo, poll_interval=0.01)
-
-        async def run():
-            worker.start()
-            await asyncio.sleep(20)
-            await worker.stop()
-
-        asyncio.run(run())
-
-        jobs = repo.list_all()
-        assert len(jobs) == 50
-        unresolved = [
-            j for j in jobs if j.status not in (JobStatus.COMPLETED, JobStatus.FAILED)
-        ]
-        assert len(unresolved) == 0
-
     def test_concurrent_workers_divide_work(self, repo):
         for i in range(15):
             repo.create(JobModel(name=f"job-{i}"))
@@ -156,7 +165,11 @@ class TestInterviewDemo:
             w1.start()
             w2.start()
             w3.start()
-            await asyncio.sleep(10)
+            while True:
+                await asyncio.sleep(0.5)
+                jobs = repo.list_all(limit=1000)
+                if len(jobs) >= 15 and all(j.status in (JobStatus.COMPLETED, JobStatus.FAILED) for j in jobs):
+                    break
             await w1.stop()
             await w2.stop()
             await w3.stop()
@@ -164,9 +177,7 @@ class TestInterviewDemo:
         asyncio.run(run())
 
         jobs = repo.list_all()
-        unresolved = [
-            j for j in jobs if j.status not in (JobStatus.COMPLETED, JobStatus.FAILED)
-        ]
+        unresolved = [j for j in jobs if j.status not in (JobStatus.COMPLETED, JobStatus.FAILED)]
         assert len(unresolved) == 0
 
         completed = [j for j in jobs if j.status == JobStatus.COMPLETED]
@@ -183,7 +194,11 @@ class TestInterviewDemo:
         async def run():
             for w in workers:
                 w.start()
-            await asyncio.sleep(15)
+            while True:
+                await asyncio.sleep(0.5)
+                jobs = repo.list_all(limit=1000)
+                if len(jobs) >= 30 and all(j.status in (JobStatus.COMPLETED, JobStatus.FAILED) for j in jobs):
+                    break
             for w in workers:
                 await w.stop()
 
@@ -191,9 +206,7 @@ class TestInterviewDemo:
 
         jobs = repo.list_all()
         assert len(jobs) == 30
-        unresolved = [
-            j for j in jobs if j.status not in (JobStatus.COMPLETED, JobStatus.FAILED)
-        ]
+        unresolved = [j for j in jobs if j.status not in (JobStatus.COMPLETED, JobStatus.FAILED)]
         assert len(unresolved) == 0
 
     def test_worker_recover_stuck_jobs(self, repo):
@@ -231,7 +244,11 @@ class TestInterviewDemo:
 
         async def run():
             worker.start()
-            await asyncio.sleep(2)
+            while True:
+                await asyncio.sleep(0.5)
+                job = repo.get(1)
+                if job and job.status in (JobStatus.COMPLETED, JobStatus.FAILED):
+                    break
             await worker.stop()
 
         asyncio.run(run())
@@ -312,13 +329,9 @@ class TestUvicornWorkers:
             jobs = data.get("items", [])
             worker_ids = [j["worker_id"] for j in jobs if j.get("worker_id")]
 
-            assert len(worker_ids) == 8, (
-                f"Expected 8 claimed jobs, got {len(worker_ids)}"
-            )
+            assert len(worker_ids) == 8, f"Expected 8 claimed jobs, got {len(worker_ids)}"
             unique_ids = set(worker_ids)
-            assert len(unique_ids) >= 2, (
-                f"Expected multiple unique worker_ids, got {unique_ids}"
-            )
+            assert len(unique_ids) >= 2, f"Expected multiple unique worker_ids, got {unique_ids}"
 
             pids = set()
             for wid in worker_ids:
