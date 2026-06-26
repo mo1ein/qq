@@ -63,7 +63,7 @@ class TestClaimJob:
         claimed = claim_job(client, job["id"])
         assert claimed["status"] == "CLAIMED"
         assert claimed["worker_id"] is not None
-        assert len(claimed["worker_id"]) == 12
+        assert claimed["worker_id"].startswith("api-worker-")
         assert claimed["claim_count"] == 1
 
     def test_claim_nonexistent_job_returns_404(self, client):
@@ -290,7 +290,7 @@ class TestConcurrentClaim:
         assert results.count(200) == 1
         assert len(worker_ids) == 1
         assert worker_ids[0] is not None
-        assert len(worker_ids[0]) == 12
+        assert worker_ids[0].startswith("api-worker-")
 
         final = client.get(f"/jobs/{job_id}").json()
         assert final["status"] == "CLAIMED"

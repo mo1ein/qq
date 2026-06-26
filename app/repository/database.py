@@ -52,10 +52,6 @@ class Database:
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("PRAGMA busy_timeout=5000")
             conn.executescript(SCHEMA_SQL)
-            conn.execute(
-                "UPDATE jobs SET status = 'FAILED', retryable = 1 "
-                "WHERE status = 'retry_wait'"
-            )
 
     @contextmanager
     def session(self):

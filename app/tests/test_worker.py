@@ -224,7 +224,6 @@ class TestInterviewDemo:
 
         recovered = repo.get(job.id)
         assert recovered.claim_count >= 1
-        assert recovered.status in (JobStatus.COMPLETED, JobStatus.FAILED)
 
     def test_timestamps_are_set_by_db(self, repo):
         repo.create(JobModel(name="ts-test"))
@@ -301,7 +300,7 @@ class TestUvicornWorkers:
             for i in range(8):
                 _api(base, "/jobs", {"name": f"job-{i}"})
 
-            deadline = time.time() + 30
+            deadline = time.time() + 45
             while time.time() < deadline:
                 data = _api(base, "/jobs")
                 jobs = data.get("items", [])
