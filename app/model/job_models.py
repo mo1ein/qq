@@ -1,13 +1,13 @@
-from pydantic import BaseModel, ConfigDict, field_validator
 import enum
 import json
-
 from typing import Any
+
+from pydantic import BaseModel, ConfigDict, field_validator
 
 MAX_RETRIES = 5
 
 
-class JobStatus(str, enum.Enum):
+class JobStatus(enum.StrEnum):
     PENDING = "PENDING"
     CLAIMED = "CLAIMED"
     RUNNING = "RUNNING"

@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import logging
 import os
 import random
@@ -6,8 +7,7 @@ import random
 from app.model.job_models import JobModel, JobStatus
 from app.repository.database import claim_lock
 from app.repository.job_repository import JobRepository
-from app.utils.util import classify_error, compute_backoff_delay
-from app.utils.util import FailureSimulator
+from app.utils.util import FailureSimulator, classify_error, compute_backoff_delay
 
 logger = logging.getLogger(__name__)
 
@@ -37,10 +37,8 @@ class Worker:
         self._task.cancel()
         for t in self._active:
             t.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await self._task
-        except asyncio.CancelledError:
-            pass
         logger.info("Worker shut down")
 
     async def _loop(self) -> None:

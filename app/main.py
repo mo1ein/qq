@@ -2,12 +2,13 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from app.api.routes import router
-from app.repository.database import get_database, get_job_repository
-from app.service.worker import Worker
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+
+from app.api.routes import router
+from app.repository.database import get_database, get_job_repository
+from app.service.worker import Worker
 
 logging.basicConfig(
     level=logging.INFO,

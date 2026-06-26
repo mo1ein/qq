@@ -1,8 +1,8 @@
 import json
 import sqlite3
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-from app.model.job_models import JobStatus, JobModel
+from app.model.job_models import JobModel, JobStatus
 from app.repository.database import Database
 
 
@@ -124,7 +124,7 @@ class JobRepository:
     def claim_next_retryable(self, worker_id: str) -> JobModel | None:
         with self.db.session() as conn:
             conn.execute("BEGIN IMMEDIATE")
-            now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+            now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
             row = conn.execute(
                 """
                 SELECT * FROM jobs
@@ -158,7 +158,7 @@ class JobRepository:
 
     def recover_stuck_jobs(self, timeout_minutes: int = 5) -> int:
         cutoff = (
-            datetime.now(timezone.utc) - timedelta(minutes=timeout_minutes)
+            datetime.now(UTC) - timedelta(minutes=timeout_minutes)
         ).strftime("%Y-%m-%d %H:%M:%S")
         with self.db.session() as conn:
             conn.execute("BEGIN IMMEDIATE")

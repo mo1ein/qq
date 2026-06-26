@@ -1,4 +1,5 @@
-from app.model.job_models import JobModel, JobStatus
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
+
 from app.api.requests.job_requests import (
     CreateJobRequest,
     FailJobRequest,
@@ -7,9 +8,9 @@ from app.api.requests.job_requests import (
     PaginatedJobsResponse,
     WorkerRequest,
 )
+from app.model.job_models import JobModel, JobStatus
 from app.repository.database import get_job_service
 from app.service.job_service import JobService
-from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 

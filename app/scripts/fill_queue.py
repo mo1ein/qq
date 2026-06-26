@@ -9,8 +9,7 @@ import random
 import sqlite3
 import string
 import time
-from datetime import datetime, timezone
-
+from datetime import UTC, datetime
 
 SAMPLE_JOBS = [
     (
@@ -97,7 +96,7 @@ def rand_name():
 
 def insert_jobs(db_path: str, count: int):
     conn = sqlite3.connect(db_path)
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
     for _ in range(count):
         name, payload_fn = random.choice(SAMPLE_JOBS)
         payload = json.dumps(payload_fn())
