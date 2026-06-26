@@ -14,6 +14,13 @@ make test             # Run all tests
 make run              # Start server on port 8000
 ```
 
+## Run with Docker
+
+```bash
+make docker-build     # Build image
+make docker-run       # Run on port 8000
+```
+
 ## Multi-Worker Setup
 
 Each worker gets a unique ID: `worker-{PID}`.
