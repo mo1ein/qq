@@ -1,14 +1,13 @@
 import uuid
 
 from app.model.job_models import (
+    VALID_TRANSITIONS,
     JobModel,
     JobStatus,
-    VALID_TRANSITIONS,
 )
 from app.repository.database import claim_lock
 from app.repository.job_repository import JobRepository
 from app.utils.util import compute_backoff_delay
-
 
 DEFAULT_WORKER_PREFIX = "api-worker"
 

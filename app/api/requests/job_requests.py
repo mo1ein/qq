@@ -1,13 +1,12 @@
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from app.model.job_models import JobStatus, MAX_RETRIES
+from app.model.job_models import MAX_RETRIES, JobStatus
 
 
 class CreateJobRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
-    payload: Optional[dict] = None
+    payload: dict | None = None
     max_retries: int = Field(default=MAX_RETRIES, ge=0, le=100)
 
 
@@ -15,13 +14,13 @@ class JobResponse(BaseModel):
     id: int
     name: str
     status: JobStatus
-    payload: Optional[dict] = None
-    worker_id: Optional[str] = None
+    payload: dict | None = None
+    worker_id: str | None = None
     claim_count: int = 0
     retry_count: int = 0
     max_retries: int = 5
-    next_retry_at: Optional[str] = None
-    last_error: Optional[str] = None
+    next_retry_at: str | None = None
+    last_error: str | None = None
     retryable: bool = True
     created_at: str
     updated_at: str
@@ -31,7 +30,7 @@ class JobListItem(BaseModel):
     id: int
     name: str
     status: JobStatus
-    worker_id: Optional[str] = None
+    worker_id: str | None = None
     claim_count: int = 0
     retry_count: int = 0
     retryable: bool = True

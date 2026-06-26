@@ -10,8 +10,7 @@ from collections import Counter
 import pytest
 
 from app.model.job_models import JobModel, JobStatus
-from app.repository.database import Database
-from app.repository.database import set_database
+from app.repository.database import Database, set_database
 from app.repository.job_repository import JobRepository
 from app.service.worker import WORKER_ID, Worker
 

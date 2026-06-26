@@ -4,8 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.repository.database import Database
-from app.repository.database import set_database
+from app.repository.database import Database, set_database
 
 
 @pytest.fixture(autouse=True)
