@@ -4,7 +4,32 @@ A job queue built with **FastAPI + SQLite** where background workers poll, claim
 
 ![Dashboard](dashboard.png)
 
-## How It Works (TL;DR)
+
+## Quick Start
+
+```bash
+make install          # Install dependencies
+make env              # create .env
+make test             # Run all tests
+make run              # Start server on port 8000
+```
+
+## Multi-Worker Setup
+
+Each worker gets a unique ID: `worker-{PID}`.
+
+```bash
+# Single worker (default, with hot reload)
+make run
+
+# 4 worker processes
+uv run uvicorn app.main:app --workers 4 --host 0.0.0.0 --port 8000
+```
+
+All workers share the same SQLite database. `BEGIN IMMEDIATE` ensures only one can write at a time. Each worker picks different jobs via `ORDER BY created_at ASC LIMIT 1` inside a serialized transaction.
+
+
+## How It Works
 
 1. **API** creates a job → stored in SQLite as `PENDING`
 2. **Worker** runs a loop: every 500ms it polls the database for the next available job
@@ -35,7 +60,45 @@ sequenceDiagram
     Worker->>DB: UPDATE SET status=COMPLETED
 ```
 
-## Worker Loop — Step by Step
+## Race condition — How Double-Claim Is Prevented
+
+```mermaid
+flowchart LR
+    W1[Worker A] -->|acquire| LOCK[claim_lock]
+    W2[Worker B] -->|waiting| LOCK
+    LOCK -->|granted| W1
+    W1 --> SQL[BEGIN IMMEDIATE + UPDATE]
+    SQL -->|rowcount=1| OK[Claimed]
+    SQL -->|rowcount=0| FAIL[Already claimed]
+    W1 -->|release| LOCK
+    LOCK -->|granted| W2
+```
+
+**Layer 1 — `threading.Lock`:** Prevents two threads in the same process from racing on the SELECT + UPDATE pair. Without it, Thread A could read a PENDING job, then Thread B reads the same row before A commits — both would try to claim it. The lock serializes access so only one thread at a time runs the claim sequence.
+
+**Layer 2 — `BEGIN IMMEDIATE`:** SQLite's file-level write lock. When a transaction starts with `BEGIN IMMEDIATE`, it acquires a reserved write lock on the database file. Any other process trying to write will block until this transaction commits. This is what prevents two separate uvicorn worker processes from double-claiming the same job — even though they have separate `threading.Lock` instances.
+
+**Together:** The `threading.Lock` is a fast in-process optimization that avoids unnecessary SQLite lock contention. The `BEGIN IMMEDIATE` is the real guarantee that works across processes. Even without the thread lock, the system would be correct — just slower under high concurrency.
+
+## State Machine
+
+```mermaid
+flowchart LR
+    START([Start]) --> PENDING[PENDING]
+    PENDING -->|Worker claims| CLAIMED[CLAIMED]
+    CLAIMED -->|Worker starts| RUNNING[RUNNING]
+    CLAIMED -->|Worker fails| FAILED[FAILED]
+    CLAIMED -->|Worker releases| PENDING
+    RUNNING -->|Success| COMPLETED[COMPLETED]
+    RUNNING -->|Failure| FAILED
+    FAILED -->|Requeue / Retry| PENDING
+    COMPLETED --> END([End])
+```
+
+Jobs flow through five states: `PENDING` → `CLAIMED` → `RUNNING` → `COMPLETED` or `FAILED`. Failed jobs can be retried back to `PENDING` via requeue or automatic retry with backoff. Each transition is enforced both at the service layer (`VALID_TRANSITIONS` dict) and at the database layer (`WHERE status = ?`).
+
+
+## Worker Loop 
 
 ```mermaid
 flowchart LR
@@ -50,12 +113,7 @@ flowchart LR
     SLEEP --> START
 ```
 
-| Step | What Happens |
-|------|-------------|
-| **Recover** | Jobs stuck in CLAIMED/RUNNING for >5min are marked FAILED |
-| **Claim** | Pick oldest PENDING job, atomically set to CLAIMED with `BEGIN IMMEDIATE` |
-| **Execute** | Run the actual job logic |
-| **Finish** | Mark job COMPLETED or FAILED |
+The worker runs an infinite loop: poll for a PENDING job, claim it atomically, execute it, and repeat. If no job is found, it sleeps and retries. Every 30 seconds it also checks for stuck jobs (CLAIMED/RUNNING for >5 min) and marks them FAILED so they can be retried.
 
 ## Retry with Exponential Backoff
 
@@ -78,66 +136,4 @@ flowchart LR
 
 **Why jitter?** Prevents thundering herd — if 100 jobs fail simultaneously, they won't all retry at the exact same moment.
 
-## State Machine
 
-```mermaid
-stateDiagram-v2
-    [*] --> PENDING           : Create job
-    PENDING --> CLAIMED       : Worker claims
-    CLAIMED --> RUNNING       : Worker starts
-    CLAIMED --> FAILED        : Worker fails
-    CLAIMED --> PENDING       : Worker releases
-    RUNNING --> COMPLETED     : Success
-    RUNNING --> FAILED        : Failure
-    FAILED --> PENDING        : Requeue / Retry
-    COMPLETED --> [*]
-```
-
-| Status | Meaning |
-|--------|---------|
-| `PENDING` | Waiting in the queue |
-| `CLAIMED` | Reserved by a worker |
-| `RUNNING` | Worker is executing |
-| `COMPLETED` | Done successfully |
-| `FAILED` | Permanently failed or retryable |
-
-## Concurrency — How Double-Claim Is Prevented
-
-```mermaid
-flowchart LR
-    W1[Worker A] -->|acquire| LOCK[claim_lock]
-    W2[Worker B] -->|waiting| LOCK
-    LOCK -->|granted| W1
-    W1 --> SQL[BEGIN IMMEDIATE + UPDATE]
-    SQL -->|rowcount=1| OK[Claimed]
-    SQL -->|rowcount=0| FAIL[Already claimed]
-    W1 -->|release| LOCK
-    LOCK -->|granted| W2
-```
-
-**Layer 1 — `threading.Lock`:** One thread at a time per process.
-
-**Layer 2 — `BEGIN IMMEDIATE`:** SQLite write lock across processes.
-
-## Multi-Worker Setup
-
-Each worker gets a unique ID: `worker-{PID}`.
-
-```bash
-# Single worker (default, with hot reload)
-make run
-
-# 4 worker processes
-uv run uvicorn app.main:app --workers 4 --host 0.0.0.0 --port 8000
-```
-
-All workers share the same SQLite database. `BEGIN IMMEDIATE` ensures only one can write at a time. Each worker picks different jobs via `ORDER BY created_at ASC LIMIT 1` inside a serialized transaction.
-
-## Quick Start
-
-```bash
-make install          # Install dependencies
-make env              # create .env
-make test             # Run all tests
-make run              # Start server on port 8000
-```
